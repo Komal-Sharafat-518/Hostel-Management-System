@@ -257,6 +257,7 @@ void studentMenu(Student students[], int count) {
                 	 break;
                 case 5:
                 	 viewFeedback(students, count);
+            break;
                 	
             case 6:
                 if (students[index].isPaid) {
@@ -273,7 +274,7 @@ void studentMenu(Student students[], int count) {
             default:
                 cout << "Invalid choice.\n";
         }
-    } while (choice != 5);
+    } while (choice != 7);
 }
 
 
