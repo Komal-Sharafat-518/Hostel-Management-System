@@ -1,27 +1,23 @@
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <string>
 using namespace std;
 
-
 const int MAX_STUDENTS = 100;
 
-
 struct Student {
-    int id;
+    string id;          // e.g. "2024-CS-599" — kept as text, not a number
     string name;
     int age;
     string roomType;
- 
     bool isPaid;
     string complaint;
     string feedback;
 };
 
-
 Student students[MAX_STUDENTS];
 int studentCount = 0;
-
 
 void ensureFileExists(const string& filePath);
 void saveStudentsToFile(const Student students[], int count);
@@ -31,8 +27,12 @@ void viewFeedback(const Student students[], int count);
 void showIntro();
 void wardenMenu(Student students[], int& count);
 void studentMenu(Student students[], int count);
+int readMenuChoice();
+bool idExists(const Student students[], int count, const string& id);
+string readNonEmptyLine(const string& prompt);
+int readAge(const string& prompt);
 
-
+// Makes sure the data file exists so ifstream never opens a missing file.
 void ensureFileExists(const string& filePath) {
     ifstream file(filePath);
     if (!file) {
@@ -40,7 +40,6 @@ void ensureFileExists(const string& filePath) {
         outFile.close();
     }
 }
-
 
 void saveStudentsToFile(const Student students[], int count) {
     ofstream file("students.txt", ios::trunc);
@@ -60,7 +59,6 @@ void saveStudentsToFile(const Student students[], int count) {
     file.close();
 }
 
-
 void loadStudentsFromFile(Student students[], int& count) {
     ifstream file("students.txt");
     if (!file) {
@@ -69,23 +67,91 @@ void loadStudentsFromFile(Student students[], int& count) {
     }
     count = 0;
     while (file && count < MAX_STUDENTS) {
-        file >> students[count].id;
-        if (file.fail()) break;  
+        string id;
+        if (!getline(file, id)) break;   // end of file / nothing left to read
+        if (id.empty()) break;           // trailing blank line, stop cleanly
+
+        string name;
+        getline(file, name);
+
+        int age;
+        file >> age;
+        if (file.fail()) break;
         file.ignore();
-        getline(file, students[count].name);
-        file >> students[count].age;
+
+        string roomType;
+        getline(file, roomType);
+
+        bool isPaid;
+        file >> isPaid;
+        if (file.fail()) break;
         file.ignore();
-        getline(file, students[count].roomType);
-        file >> students[count].isPaid;
-        file.ignore();
-        getline(file, students[count].complaint);
-        getline(file, students[count].feedback);
+
+        string complaint, feedback;
+        getline(file, complaint);
+        getline(file, feedback);
+
+        // Sanity check: reject clearly corrupted/misaligned records instead
+        // of silently filling the array with garbage.
+        if (age <= 0 || age > 120) {
+            cout << "Warning: students.txt appears corrupted at record "
+                 << (count + 1) << ". Stopped loading further records.\n";
+            break;
+        }
+
+        students[count].id = id;
+        students[count].name = name;
+        students[count].age = age;
+        students[count].roomType = roomType;
+        students[count].isPaid = isPaid;
+        students[count].complaint = complaint;
+        students[count].feedback = feedback;
         count++;
     }
     file.close();
 }
 
-// Function to view complaints
+// Reads a menu choice safely; re-prompts instead of looping forever on bad input.
+int readMenuChoice() {
+    int choice;
+    while (!(cin >> choice)) {
+        cout << "Invalid input. Please enter a number: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    return choice;
+}
+
+// Reads a full line and keeps asking until it's non-empty.
+// Assumes any leftover newline in cin has already been cleared by the caller.
+string readNonEmptyLine(const string& prompt) {
+    string value;
+    do {
+        cout << prompt;
+        getline(cin, value);
+    } while (value.empty());
+    return value;
+}
+
+int readAge(const string& prompt) {
+    int age;
+    cout << prompt;
+    while (!(cin >> age) || age <= 0 || age > 120) {
+        cout << "Invalid age. Enter a number between 1 and 120: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    return age;
+}
+
+bool idExists(const Student students[], int count, const string& id) {
+    for (int i = 0; i < count; i++) {
+        if (students[i].id == id) return true;
+    }
+    return false;
+}
+
 void viewComplaints(const Student students[], int count) {
     bool hasComplaints = false;
     for (int i = 0; i < count; i++) {
@@ -99,7 +165,6 @@ void viewComplaints(const Student students[], int count) {
     if (!hasComplaints) cout << "No complaints found.\n";
 }
 
-// Function to view feedback
 void viewFeedback(const Student students[], int count) {
     bool hasFeedback = false;
     for (int i = 0; i < count; i++) {
@@ -113,16 +178,14 @@ void viewFeedback(const Student students[], int count) {
     if (!hasFeedback) cout << "No feedback submitted.\n";
 }
 
-
 void showIntro() {
-     cout << "\nWelcome to Student's Nest Hostel!\n";
+    cout << "\nWelcome to Student's Nest Hostel!\n";
     cout << "Where Clean, Fresh, and Refreshing Environment is a Priority.\n";
     cout << "At Student's Nest, we believe that a healthy environment is key to a productive life.\n";
     cout << "Here, studying comes first, but we also care about comfort, safety, and fun.\n";
     cout << "We provide a balanced atmosphere where students can focus on their academics while also enjoying a great community and facilities.\n";
     cout << "Thank you for choosing Student's Nest Hostel!\n\n";
 }
-
 
 void wardenMenu(Student students[], int& count) {
     int choice;
@@ -135,7 +198,8 @@ void wardenMenu(Student students[], int& count) {
         cout << "5. Update Payment Status\n";
         cout << "6. Exit\n";
         cout << "Enter your choice: ";
-        cin >> choice;
+        choice = readMenuChoice();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // clear leftover newline
 
         switch (choice) {
             case 1: {
@@ -143,14 +207,16 @@ void wardenMenu(Student students[], int& count) {
                     cout << "Student limit reached.\n";
                     break;
                 }
-                cout << "Enter ID, Name, Age, Room Type: ";
-                cin >> students[count].id;
-                cin.ignore();
-                getline(cin, students[count].name);
-                cin >> students[count].age;
-                cin.ignore();
-                getline(cin, students[count].roomType);
-         
+                string newId = readNonEmptyLine("Enter ID (e.g. 2024-CS-599): ");
+                if (idExists(students, count, newId)) {
+                    cout << "A student with this ID already exists.\n";
+                    break;
+                }
+                students[count].id = newId;
+                students[count].name = readNonEmptyLine("Enter Name: ");
+                students[count].age = readAge("Enter Age: ");
+                students[count].roomType = readNonEmptyLine("Enter Room Type: ");
+
                 students[count].isPaid = false;
                 students[count].complaint = "";
                 students[count].feedback = "";
@@ -160,6 +226,10 @@ void wardenMenu(Student students[], int& count) {
                 break;
             }
             case 2:
+                if (count == 0) {
+                    cout << "No students registered yet.\n";
+                    break;
+                }
                 for (int i = 0; i < count; i++) {
                     cout << "ID: " << students[i].id
                          << ", Name: " << students[i].name
@@ -175,9 +245,7 @@ void wardenMenu(Student students[], int& count) {
                 viewFeedback(students, count);
                 break;
             case 5: {
-                int id;
-                cout << "Enter Student ID to update payment: ";
-                cin >> id;
+                string id = readNonEmptyLine("Enter Student ID to update payment: ");
                 bool found = false;
                 for (int i = 0; i < count; i++) {
                     if (students[i].id == id) {
@@ -200,11 +268,8 @@ void wardenMenu(Student students[], int& count) {
     } while (choice != 6);
 }
 
-// Student Menu
 void studentMenu(Student students[], int count) {
-    int id;
-    cout << "Enter your ID: ";
-    cin >> id;
+    string id = readNonEmptyLine("Enter your ID: ");
 
     int index = -1;
     for (int i = 0; i < count; i++) {
@@ -230,7 +295,8 @@ void studentMenu(Student students[], int count) {
         cout << "6. Pay Fees\n";
         cout << "7. Exit\n";
         cout << "Enter your choice: ";
-        cin >> choice;
+        choice = readMenuChoice();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // clear leftover newline
 
         switch (choice) {
             case 1:
@@ -239,26 +305,21 @@ void studentMenu(Student students[], int count) {
                      << ", Room Type: " << students[index].roomType << endl;
                 break;
             case 2:
-                cin.ignore();
-                cout << "Enter Complaint: ";
-                getline(cin, students[index].complaint);
+                students[index].complaint = readNonEmptyLine("Enter Complaint: ");
                 saveStudentsToFile(students, count);
                 cout << "Complaint submitted.\n";
                 break;
             case 3:
-                cin.ignore();
-                cout << "Enter Feedback: ";
-                getline(cin, students[index].feedback);
+                students[index].feedback = readNonEmptyLine("Enter Feedback: ");
                 saveStudentsToFile(students, count);
                 cout << "Feedback submitted.\n";
                 break;
-                case 4:
-                	 viewComplaints(students, count);
-                	 break;
-                case 5:
-                	 viewFeedback(students, count);
-            break;
-                	
+            case 4:
+                viewComplaints(students, count);
+                break;
+            case 5:
+                viewFeedback(students, count);
+                break;
             case 6:
                 if (students[index].isPaid) {
                     cout << "Fees already paid.\n";
@@ -277,8 +338,8 @@ void studentMenu(Student students[], int count) {
     } while (choice != 7);
 }
 
-
 int main() {
+    ensureFileExists("students.txt");
     loadStudentsFromFile(students, studentCount);
     showIntro();
 
