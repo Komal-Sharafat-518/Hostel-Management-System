@@ -58,8 +58,8 @@ This means student information can persist between program sessions rather than 
 ### 🏠 Welcome Screen
 
 <p align="center">
-  <img src="screenshots/welcome.png" alt="Welcome Screen" width="700">
-</p>
+  <img src="screenshots/welcome.png" alt="Student's Nest Hostel Management System" width="700">
+</p>>
 
 ---
 
